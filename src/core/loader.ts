@@ -1,19 +1,9 @@
-import { Assets, Texture } from "pixi.js";
+import { Assets } from "pixi.js";
+import { LoadedTextures } from "../types";
 
-export interface ILoadedTextures {
-  background: Texture;
-  main: Texture;
-  fire: Texture;
-  water: Texture;
-  earth: Texture;
-  air: Texture;
-  cell: Texture;
-  block: Texture;
-}
-
-export async function loadTextures(): Promise<ILoadedTextures> {
+export async function loadTextures(): Promise<LoadedTextures> {
   Assets.addBundle("main", {
-    background: "/assets/woodbackground.jpeg",
+    background: "/assets/soloLeveling.jpeg",
     main: "/assets/main.png",
     fire: "/assets/cell1.png",
     water: "/assets/cell2.png",
@@ -24,5 +14,5 @@ export async function loadTextures(): Promise<ILoadedTextures> {
   });
 
   const bundle = await Assets.loadBundle("main");
-  return bundle as ILoadedTextures;
+  return bundle as LoadedTextures;
 }

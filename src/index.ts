@@ -1,57 +1,45 @@
 import { createApp } from "./core/app";
 import { loadTextures } from "./core/loader";
-import { createBoard } from "./game/board";
-import { ElementEntity } from "./game/elements";
-import { moveElement } from "./game/movement";
+import { setupGameHandlers } from "./game/setupGameHandlers";
+import { ElementEntity } from "./types";
+import { initUI } from "./ui/initUI";
+
+let currentLevel = 0;
+let elements: ElementEntity[] = [];
+let timerId: ReturnType<typeof setTimeout> | null = null;
+let intervalId: ReturnType<typeof setInterval> | null = null;
+let timeRemaining = 40;
+let isInteractionBlocked = false;
 
 async function main() {
   const app = await createApp();
   const textures = await loadTextures();
-  /* 
-  const fieldMatrix = [
-    [0, 9, 0, 0, 0, 0, 0, 11, 0],
-    [1, 1, 1, 0, 0, 0, 1, 1, 1],
-    [1, 9, 1, 1, 0, 1, 1, 11, 1],
-    [1, 1, 1, 1, 1, 1, 1, 1, 1],
-    [1, 1, 1, 1, 1, 1, 1, 1, 1],
-    [1, 10, 1, 1, 0, 1, 1, 12, 1],
-    [1, 1, 1, 0, 0, 0, 1, 1, 1],
-    [0, 10, 0, 0, 0, 0, 0, 12, 0],
-  ]; */
-  const fieldMatrix = [
-    [0, 109, 0, 0, 0, 0, 0, 111, 0],
-    [1, 1, 1, 0, 0, 0, 1, 1, 1],
-    [1, 9, 1, 1, 0, 1, 1, 11, 1],
-    [1, 1, 1, 1, 1, 1, 1, 1, 1],
-    [1, 1, 1, 1, 1, 1, 1, 1, 1],
-    [1, 10, 1, 1, 0, 1, 1, 12, 1],
-    [1, 1, 1, 0, 0, 0, 1, 1, 1],
-    [0, 110, 0, 0, 0, 0, 0, 112, 0],
-  ];
-  let elements = []; // Оголошуємо пустий масив
 
-  const onElementMove = (entity, newX, newY) => {
-    // Bounds check
-    if (
-      newX < 0 ||
-      newX >= fieldMatrix[0].length ||
-      newY < 0 ||
-      newY >= fieldMatrix.length
-    )
-      return false;
+  const { timerDisplay, buttonContainer } = initUI();
 
-    if (fieldMatrix[newY][newX] !== 1) return false;
-
-    for (const other of elements) {
-      if (other !== entity && other.x === newX && other.y === newY) {
-        return false;
-      }
-    }
-
-    return true;
+  const gameAPI = {
+    getCurrentLevel: () => currentLevel,
+    setCurrentLevel: (v: number) => (currentLevel = v),
+    getElements: () => elements,
+    setElements: (e: ElementEntity[]) => (elements = e),
+    getIsBlocked: () => isInteractionBlocked,
+    setIsBlocked: (v: boolean) => (isInteractionBlocked = v),
+    getTimerId: () => timerId,
+    setTimerId: (id: ReturnType<typeof setTimeout> | null) => (timerId = id),
+    getIntervalId: () => intervalId,
+    setIntervalId: (id: ReturnType<typeof setInterval> | null) =>
+      (intervalId = id),
+    getTimeRemaining: () => timeRemaining,
+    setTimeRemaining: (v: number) => (timeRemaining = v),
   };
 
-  elements = createBoard(app, textures, fieldMatrix, onElementMove);
+  setupGameHandlers({
+    app,
+    textures,
+    buttonContainer,
+    timerDisplay,
+    gameAPI,
+  });
 }
 
 main();
