@@ -160,7 +160,6 @@ export function createDraggableBlock({
       lastPointer = { x: pos.x, y: pos.y };
     }
   }
-
   function onTick() {
     const centerX =
       offsetX + Math.round((sprite.x - offsetX) / cellSize) * cellSize;
@@ -177,8 +176,39 @@ export function createDraggableBlock({
       sprite.x = lerp(sprite.x, centerX, snapSpeedFactor);
       sprite.y = lerp(sprite.y, centerY, snapSpeedFactor);
     }
-  }
 
+    if (isDragging && !entity.locked && entity.type >= 9 && entity.type <= 12) {
+      const spriteCenterX = sprite.x + cellSize / 2;
+      const spriteCenterY = sprite.y + cellSize / 2;
+      const cellX = Math.floor((spriteCenterX - offsetX) / cellSize);
+      const cellY = Math.floor((spriteCenterY - offsetY) / cellSize);
+      const expectedSlot = 100 + entity.type;
+
+      if (fieldMatrix?.[cellY]?.[cellX] === expectedSlot) {
+        const cellCenterX = offsetX + cellX * cellSize + cellSize / 2;
+        const cellCenterY = offsetY + cellY * cellSize + cellSize / 2;
+
+        const inCenter =
+          Math.abs(spriteCenterX - cellCenterX) < cellSize / 2 &&
+          Math.abs(spriteCenterY - cellCenterY) < cellSize / 2;
+
+        if (inCenter) {
+          sprite.x = offsetX + cellX * cellSize;
+          sprite.y = offsetY + cellY * cellSize;
+
+          entity.x = cellX;
+          entity.y = cellY;
+          entity.locked = true;
+          isDragging = false;
+
+          app.stage.off("pointermove", onPointerMove);
+          app.ticker.remove(onTick);
+          sprite.eventMode = "none";
+          sprite.cursor = "default";
+        }
+      }
+    }
+  }
   function onPointerUp() {
     isDragging = false;
     app.stage.off("pointermove", onPointerMove);
