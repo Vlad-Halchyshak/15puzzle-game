@@ -8,7 +8,8 @@ let currentLevel = 0;
 let elements: ElementEntity[] = [];
 let timerId: ReturnType<typeof setTimeout> | null = null;
 let intervalId: ReturnType<typeof setInterval> | null = null;
-let timeRemaining = 40;
+let timeRemaining = 402323223;
+//let timeRemaining = 40;
 let isInteractionBlocked = false;
 
 async function main() {

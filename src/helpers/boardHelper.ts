@@ -6,29 +6,64 @@ export function isAllowedCell(
   elements: ElementEntity[],
   fieldMatrix: number[][],
   entity: ElementEntity
-) {
-  const val = fieldMatrix[y][x];
+): boolean {
+  const val = fieldMatrix?.[y]?.[x];
+  if (val == null) return false;
 
-  if (entity.type === 3) {
-    const isStartCell = x === entity.initialX && y === entity.initialY;
-    return val === 1 || (val >= 9 && val <= 12) || isStartCell;
+  const currentPosMap = new Map<string, ElementEntity>();
+  for (const e of elements) {
+    if (e !== entity) {
+      currentPosMap.set(`${e.x},${e.y}`, e);
+    }
   }
 
+  const key = `${x},${y}`;
+  const occupiedEntity = currentPosMap.get(key);
+  const isOccupied = !!occupiedEntity;
+
+  // For block 3
+  if (entity.type === 3) {
+    const isStartCell = x === entity.initialX && y === entity.initialY;
+
+    const isFreedCellOf912 =
+      val >= 9 && val <= 12 && (!occupiedEntity || occupiedEntity.type !== val);
+
+    const isFreedOther3 =
+      val === 3 && (!occupiedEntity || occupiedEntity.type !== 3);
+
+    return (
+      (val === 1 || isStartCell || isFreedCellOf912 || isFreedOther3) &&
+      !isOccupied
+    );
+  }
+  //For block 9, 10, 11, 12
+
   if (entity.type >= 9 && entity.type <= 12) {
-    if (
-      val === 1 ||
-      (val >= 9 && val <= 12) ||
-      val === 100 + entity.type ||
-      val === 3
-    ) {
-      return !elements.some((e) => e !== entity && e.x === x && e.y === y);
-    }
+    const isOwnSocket = val === 100 + entity.type;
+    const isEmpty = val === 1;
+    const isBlock3 = val === 3;
+    const isOwnInitialCell = x === entity.initialX && y === entity.initialY;
+
+    const isFreedAnother912 =
+      val >= 9 &&
+      val <= 12 &&
+      (val !== entity.type || isOwnInitialCell) &&
+      (!occupiedEntity || occupiedEntity.type !== val);
+
+    return (
+      (isEmpty ||
+        isOwnSocket ||
+        isBlock3 ||
+        isFreedAnother912 ||
+        isOwnInitialCell) &&
+      !isOccupied
+    );
   }
 
   return false;
 }
 
-export function isValidPath(
+/* export function isValidPath(
   entity: ElementEntity,
   newX: number,
   newY: number,
@@ -46,63 +81,32 @@ export function isValidPath(
   let x = entity.x + stepX;
   let y = entity.y + stepY;
 
-  if (entity.type === 3) {
-    while (x !== newX || y !== newY) {
-      const val = fieldMatrix[y][x];
-      const isOwnStart =
-        x === entity.initialX && y === entity.initialY && val === 3;
-
-      const isWalkable = val === 1 || (val >= 9 && val <= 12) || isOwnStart;
-
-      const isBlocked = elements.some((e) => {
-        const isOther = e !== entity && e.x === x && e.y === y;
-        const isStihia = e.type >= 9 && e.type <= 12;
-        return isOther && (isStihia || e.type === 3);
-      });
-
-      if (!isWalkable || isBlocked) return false;
-      x += stepX;
-      y += stepY;
-    }
-
-    const targetVal = fieldMatrix[newY][newX];
-    const isTargetStart =
-      newX === entity.initialX && newY === entity.initialY && targetVal === 3;
-
-    const isTargetBlocked = elements.some((e) => {
-      const isSamePos = e.x === newX && e.y === newY;
-      const isStihia = e.type >= 9 && e.type <= 12;
-      return isSamePos && (isStihia || e.type === 3);
-    });
-
-    return (
-      (targetVal === 1 ||
-        (targetVal >= 9 && targetVal <= 12) ||
-        isTargetStart) &&
-      !isTargetBlocked
-    );
-  }
-
   while (x !== newX || y !== newY) {
     const val = fieldMatrix[y][x];
-    const isWalkable =
-      val === 1 ||
-      val === 3 ||
-      val === entity.type ||
-      val === 100 + entity.type ||
-      (val >= 9 && val <= 12) ||
-      (val >= 109 && val <= 112);
 
-    if (!isWalkable) return false;
+    const allowed =
+      val === 1 || val === 100 + entity.type || val === entity.type;
 
-    const isBlocked = elements.some(
-      (e) => e.x === x && e.y === y && e !== entity
+    const blocked = elements.some(
+      (e) => e !== entity && e.x === x && e.y === y
     );
-    if (isBlocked) return false;
+
+    if (!allowed || blocked) return false;
 
     x += stepX;
     y += stepY;
   }
 
-  return true;
+  const finalVal = fieldMatrix[newY][newX];
+  const finalAllowed =
+    finalVal === 1 ||
+    finalVal === 100 + entity.type ||
+    finalVal === entity.type;
+
+  const finalBlocked = elements.some(
+    (e) => e !== entity && e.x === newX && e.y === newY
+  );
+
+  return finalAllowed && !finalBlocked;
 }
+ */

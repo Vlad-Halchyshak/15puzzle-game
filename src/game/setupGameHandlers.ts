@@ -22,7 +22,8 @@ export function setupGameHandlers({
     gameAPI.setElements(elements);
 
     gameAPI.setIsBlocked(false);
-    gameAPI.setTimeRemaining(40);
+    //gameAPI.setTimeRemaining(40);
+    gameAPI.setTimeRemaining(42323223230);
     updateTimerUI();
 
     const oldInterval = gameAPI.getIntervalId();

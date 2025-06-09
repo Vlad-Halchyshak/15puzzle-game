@@ -15,7 +15,7 @@ export function createBoard(
   bg.width = app.screen.width;
   bg.height = app.screen.height;
   app.stage.addChild(bg);
-
+  app.stage.eventMode = "dynamic";
   const cellSize = 64;
   const offsetX = 600;
   const offsetY = 200;

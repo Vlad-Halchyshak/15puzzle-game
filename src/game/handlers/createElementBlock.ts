@@ -1,6 +1,6 @@
 import { Application, Sprite } from "pixi.js";
 import { ElementEntity } from "../../types";
-import { isAllowedCell, isValidPath } from "../../helpers/boardHelper";
+import { isAllowedCell } from "../../helpers/boardHelper";
 
 export function createElementBlock(
   app: Application,
@@ -9,172 +9,176 @@ export function createElementBlock(
   offsetY: number,
   x: number,
   y: number,
-  elementSprite: Sprite,
+  sprite: Sprite,
   fieldMatrix: number[][],
   elements: ElementEntity[],
   getIsInteractionBlocked: () => boolean
 ): ElementEntity {
-  elementSprite.width = elementSprite.height = cellSize;
-  elementSprite.x = offsetX + x * cellSize;
-  elementSprite.y = offsetY + y * cellSize;
-  elementSprite.zIndex = 1;
-  elementSprite.eventMode = "dynamic";
-  elementSprite.cursor = "pointer";
-  app.stage.addChild(elementSprite);
+  sprite.width = sprite.height = cellSize;
+  sprite.x = offsetX + x * cellSize;
+  sprite.y = offsetY + y * cellSize;
+  sprite.zIndex = 2;
+  sprite.eventMode = "static";
+  sprite.interactive = true;
+  sprite.cursor = "pointer";
 
   const entity: ElementEntity = {
-    sprite: elementSprite,
+    sprite,
     x,
     y,
     type: fieldMatrix[y][x],
+    initialX: x,
+    initialY: y,
   };
 
-  if (y !== 0 && y !== fieldMatrix.length - 1) {
-    let dragging = false;
-    let offset = { x: 0, y: 0 };
-    let dragAxis: "x" | "y" | null = null;
-    let dragStart = { x: 0, y: 0 };
+  let isDragging = false;
+  let direction: "horizontal" | "vertical" | null = null;
+  let dragOrigin = { x: 0, y: 0 };
+  let lastPointer = { x: 0, y: 0 };
+  let isSnapping = false;
+  let snapTarget = { x: 0, y: 0 };
+  let pendingDirection: "horizontal" | "vertical" | null = null;
+  let pendingPointer = { x: 0, y: 0 };
+  const snapSpeed = 8;
 
-    elementSprite.on("pointerdown", (e) => {
-      if (getIsInteractionBlocked()) return;
-      if (entity.locked) return;
-      dragging = true;
-      offset = {
-        x: e.global.x - elementSprite.x,
-        y: e.global.y - elementSprite.y,
-      };
-      dragAxis = null;
-      dragStart = { x: e.global.x, y: e.global.y };
-    });
+  sprite.on("pointerdown", (event) => {
+    if (getIsInteractionBlocked()) return;
+    if (entity.locked) return;
 
-    elementSprite.on("pointermove", (e) => {
-      if (!dragging) return;
+    const pos = event.data.global;
+    isDragging = true;
+    direction = null;
+    dragOrigin = { x: sprite.x, y: sprite.y };
+    lastPointer = { x: pos.x, y: pos.y };
+    isSnapping = false;
+    pendingDirection = null;
 
-      if (!dragAxis) {
-        const dx = e.global.x - dragStart.x;
-        const dy = e.global.y - dragStart.y;
-        const lockThreshold = 10;
-        if (Math.abs(dx) > lockThreshold) dragAxis = "x";
-        else if (Math.abs(dy) > lockThreshold) dragAxis = "y";
-        else return;
+    app.stage.on("pointermove", onPointerMove);
+    app.stage.once("pointerup", onPointerUp);
+    app.ticker.add(onTick);
+  });
+  function onPointerMove(event: any) {
+    if (!isDragging) return;
+    if (isSnapping) return;
+
+    const pos = event.data.global;
+    let dx = pos.x - lastPointer.x;
+    let dy = pos.y - lastPointer.y;
+
+    if (!direction && (Math.abs(dx) > 2 || Math.abs(dy) > 2)) {
+      direction = Math.abs(dx) > Math.abs(dy) ? "horizontal" : "vertical";
+    }
+
+    if (
+      direction &&
+      ((direction === "horizontal" &&
+        Math.abs(dy) > Math.abs(dx) &&
+        Math.abs(dy) > 2) ||
+        (direction === "vertical" &&
+          Math.abs(dx) > Math.abs(dy) &&
+          Math.abs(dx) > 2))
+    ) {
+      pendingDirection = direction === "horizontal" ? "vertical" : "horizontal";
+      pendingPointer = { x: pos.x, y: pos.y };
+
+      const centerX =
+        offsetX + Math.round((sprite.x - offsetX) / cellSize) * cellSize;
+      const centerY =
+        offsetY + Math.round((sprite.y - offsetY) / cellSize) * cellSize;
+      snapTarget = { x: centerX, y: centerY };
+      isSnapping = true;
+      return;
+    }
+
+    const gridX = Math.round((dragOrigin.x - offsetX) / cellSize);
+    const gridY = Math.round((dragOrigin.y - offsetY) / cellSize);
+
+    if (direction === "horizontal") {
+      let pixelOffset = pos.x - lastPointer.x;
+      let rawX = dragOrigin.x + pixelOffset;
+
+      let minCellX = gridX;
+      let maxCellX = gridX;
+      for (let tx = gridX - 1; tx >= 0; tx--) {
+        if (!isAllowedCell(tx, gridY, elements, fieldMatrix, entity)) break;
+        minCellX = tx;
       }
-
-      const originalX = offsetX + entity.x * cellSize;
-      const originalY = offsetY + entity.y * cellSize;
-
-      const newPosX = e.global.x - offset.x;
-      const newPosY = e.global.y - offset.y;
-
-      const maxX = offsetX + (fieldMatrix[0].length - 1) * cellSize;
-      const maxY = offsetY + (fieldMatrix.length - 1) * cellSize;
-
-      if (dragAxis === "x") {
-        const clampedX = Math.max(offsetX, Math.min(newPosX, maxX));
-        const targetX = Math.round((clampedX - offsetX) / cellSize);
-        const targetY = entity.y;
-
-        const isInsideBounds = targetX >= 0 && targetX < fieldMatrix[0].length;
-        const cellVal = isInsideBounds ? fieldMatrix[targetY][targetX] : 0;
-
-        const isOccupied = elements.some(
-          (e) => e !== entity && e.x === targetX && e.y === targetY
-        );
-
-        if (cellVal !== 0 && cellVal !== 2 && cellVal !== 3 && !isOccupied) {
-          elementSprite.x = clampedX;
-          elementSprite.y = originalY;
-        }
-      } else if (dragAxis === "y") {
-        const clampedY = Math.max(offsetY, Math.min(newPosY, maxY));
-        const targetX = entity.x;
-        const targetY = Math.round((clampedY - offsetY) / cellSize);
-
-        const isInsideBounds = targetY >= 0 && targetY < fieldMatrix.length;
-        const cellVal = isInsideBounds ? fieldMatrix[targetY][targetX] : 0;
-
-        const isOccupied = elements.some(
-          (e) => e !== entity && e.x === targetX && e.y === targetY
-        );
-
-        if (cellVal !== 0 && cellVal !== 2 && cellVal !== 3 && !isOccupied) {
-          elementSprite.y = clampedY;
-          elementSprite.x = originalX;
-        }
+      for (let tx = gridX + 1; tx < fieldMatrix[0].length; tx++) {
+        if (!isAllowedCell(tx, gridY, elements, fieldMatrix, entity)) break;
+        maxCellX = tx;
       }
-    });
+      let minX = offsetX + minCellX * cellSize;
+      let maxX = offsetX + maxCellX * cellSize;
 
-    elementSprite.on("pointerup", () => {
-      dragging = false;
-      if (entity.locked) return;
-      if (!dragAxis) return snapBack();
+      let nextX = Math.max(minX, Math.min(maxX, rawX));
+      sprite.x = nextX;
+      sprite.y = dragOrigin.y;
+      entity.x = Math.round((sprite.x - offsetX) / cellSize);
+    } else if (direction === "vertical") {
+      let pixelOffset = pos.y - lastPointer.y;
+      let rawY = dragOrigin.y + pixelOffset;
 
-      let newX = entity.x;
-      let newY = entity.y;
-
-      if (dragAxis === "x")
-        newX = Math.round((elementSprite.x - offsetX) / cellSize);
-      if (dragAxis === "y")
-        newY = Math.round((elementSprite.y - offsetY) / cellSize);
-
-      if (!isValidPath(entity, newX, newY, elements, fieldMatrix)) {
-        return snapBack();
+      let minCellY = gridY;
+      let maxCellY = gridY;
+      for (let ty = gridY - 1; ty >= 0; ty--) {
+        if (!isAllowedCell(gridX, ty, elements, fieldMatrix, entity)) break;
+        minCellY = ty;
       }
-
-      const targetCell = fieldMatrix[newY][newX];
-      const isOwnSlot = targetCell === 100 + entity.type;
-
-      if (isOwnSlot && !elements.some((e) => e.x === newX && e.y === newY)) {
-        elementSprite.x = offsetX + newX * cellSize;
-        elementSprite.y = offsetY + newY * cellSize;
-        entity.x = newX;
-        entity.y = newY;
-        entity.locked = true;
-        elementSprite.alpha = 0.95;
-        dragAxis = null;
-        return;
+      for (let ty = gridY + 1; ty < fieldMatrix.length; ty++) {
+        if (!isAllowedCell(gridX, ty, elements, fieldMatrix, entity)) break;
+        maxCellY = ty;
       }
+      let minY = offsetY + minCellY * cellSize;
+      let maxY = offsetY + maxCellY * cellSize;
 
-      if (entity.type === 3) {
-        if (targetCell >= 109 && targetCell <= 112) return snapBack();
-        if (targetCell === 2 || targetCell === 0) return snapBack();
-        const isOnTopOfElement = elements.some(
-          (e) =>
-            e !== entity &&
-            e.x === newX &&
-            e.y === newY &&
-            e.type >= 9 &&
-            e.type <= 12
-        );
-        if (isOnTopOfElement) return snapBack();
-      }
+      let nextY = Math.max(minY, Math.min(maxY, rawY));
+      sprite.y = nextY;
+      sprite.x = dragOrigin.x;
+      entity.y = Math.round((sprite.y - offsetY) / cellSize);
+    }
 
-      if (
-        isAllowedCell(newX, newY, elements, fieldMatrix, entity) &&
-        !elements.some((e) => e !== entity && e.x === newX && e.y === newY)
-      ) {
-        elementSprite.x = offsetX + newX * cellSize;
-        elementSprite.y = offsetY + newY * cellSize;
-        entity.x = newX;
-        entity.y = newY;
-      } else {
-        snapBack();
-      }
-
-      dragAxis = null;
-
-      function snapBack() {
-        elementSprite.x = offsetX + entity.x * cellSize;
-        elementSprite.y = offsetY + entity.y * cellSize;
-      }
-    });
-
-    elementSprite.on("pointerupoutside", () => {
-      dragging = false;
-      dragAxis = null;
-      elementSprite.x = offsetX + entity.x * cellSize;
-      elementSprite.y = offsetY + entity.y * cellSize;
-    });
+    const centerX =
+      offsetX + Math.round((sprite.x - offsetX) / cellSize) * cellSize;
+    const centerY =
+      offsetY + Math.round((sprite.y - offsetY) / cellSize) * cellSize;
+    if (
+      Math.abs(sprite.x - centerX) < cellSize * 0.1 &&
+      Math.abs(sprite.y - centerY) < cellSize * 0.1
+    ) {
+      dragOrigin = { x: sprite.x, y: sprite.y };
+      lastPointer = { x: pos.x, y: pos.y };
+    }
   }
 
+  function onTick() {
+    if (!isSnapping) return;
+
+    sprite.x = snapTarget.x;
+    sprite.y = snapTarget.y;
+
+    isSnapping = false;
+    direction = pendingDirection;
+    dragOrigin = { x: sprite.x, y: sprite.y };
+    lastPointer = { x: pendingPointer.x, y: pendingPointer.y };
+  }
+
+  function onPointerUp() {
+    isDragging = false;
+    app.stage.off("pointermove", onPointerMove);
+    app.ticker.remove(onTick);
+
+    entity.x = Math.round((sprite.x - offsetX) / cellSize);
+    entity.y = Math.round((sprite.y - offsetY) / cellSize);
+    sprite.x = offsetX + entity.x * cellSize;
+    sprite.y = offsetY + entity.y * cellSize;
+
+    const valAfterDrop = fieldMatrix?.[entity.y]?.[entity.x];
+    if (entity.type >= 9 && entity.type <= 12) {
+      if (valAfterDrop === 100 + entity.type) {
+        entity.locked = true;
+      }
+    }
+  }
+  app.stage.addChild(sprite);
   return entity;
 }
