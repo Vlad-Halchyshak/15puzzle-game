@@ -1,7 +1,6 @@
 import { Application, Sprite, Texture } from "pixi.js";
 import { ElementEntity, LoadedTextures } from "../types";
-import { createMainMovingBlock } from "./handlers/createMainMovingBlock";
-import { createElementBlock } from "./handlers/createElementBlock";
+import { createDraggableBlock } from "./handlers/createDragableBlock";
 
 export function createBoard(
   app: Application,
@@ -70,37 +69,41 @@ export function createBoard(
         app.stage.addChild(blockSprite);
         continue;
       }
+      // for main moving block - 3
       if (value === 3) {
-        const entity = createMainMovingBlock(
+        const entity = createDraggableBlock({
           app,
+          sprite: textureMap[3],
+          x,
+          y,
           cellSize,
           offsetX,
           offsetY,
-          x,
-          y,
-          textureMap[3],
           fieldMatrix,
           elements,
-          getIsInteractionBlocked
-        );
+          getIsInteractionBlocked,
+          type: 3,
+        });
 
         elements.push(entity);
         continue;
       }
-
+      // for elements 9-12(fire, earth, water, air)
       if (value >= 9 && value <= 12) {
-        const entity = createElementBlock(
+        const entity = createDraggableBlock({
           app,
+          sprite: textureMap[value],
+          x,
+          y,
           cellSize,
           offsetX,
           offsetY,
-          x,
-          y,
-          textureMap[value],
           fieldMatrix,
           elements,
-          getIsInteractionBlocked
-        );
+          getIsInteractionBlocked,
+          type: value,
+        });
+
         elements.push(entity);
         continue;
       }

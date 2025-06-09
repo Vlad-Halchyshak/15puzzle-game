@@ -2,23 +2,38 @@ import { Application, Sprite } from "pixi.js";
 import { ElementEntity } from "../../types";
 import { isAllowedCell } from "../../helpers/boardHelper";
 
-export function createElementBlock(
-  app: Application,
-  cellSize: number,
-  offsetX: number,
-  offsetY: number,
-  x: number,
-  y: number,
-  sprite: Sprite,
-  fieldMatrix: number[][],
-  elements: ElementEntity[],
-  getIsInteractionBlocked: () => boolean
-): ElementEntity {
+interface CreateDraggableBlockParams {
+  app: Application;
+  sprite: Sprite;
+  x: number;
+  y: number;
+  cellSize: number;
+  offsetX: number;
+  offsetY: number;
+  fieldMatrix: number[][];
+  elements: ElementEntity[];
+  getIsInteractionBlocked: () => boolean;
+  type: number;
+}
+
+export function createDraggableBlock({
+  app,
+  sprite,
+  x,
+  y,
+  cellSize,
+  offsetX,
+  offsetY,
+  fieldMatrix,
+  elements,
+  getIsInteractionBlocked,
+  type,
+}: CreateDraggableBlockParams): ElementEntity {
   sprite.width = sprite.height = cellSize;
   sprite.x = offsetX + x * cellSize;
   sprite.y = offsetY + y * cellSize;
   sprite.zIndex = 2;
-  sprite.eventMode = "static";
+  sprite.eventMode = "dynamic";
   sprite.interactive = true;
   sprite.cursor = "pointer";
 
@@ -26,7 +41,7 @@ export function createElementBlock(
     sprite,
     x,
     y,
-    type: fieldMatrix[y][x],
+    type,
     initialX: x,
     initialY: y,
   };
@@ -36,14 +51,13 @@ export function createElementBlock(
   let dragOrigin = { x: 0, y: 0 };
   let lastPointer = { x: 0, y: 0 };
   let isSnapping = false;
-  let snapTarget = { x: 0, y: 0 };
   let pendingDirection: "horizontal" | "vertical" | null = null;
-  let pendingPointer = { x: 0, y: 0 };
-  const snapSpeed = 8;
+  let justSnapped = false;
 
   sprite.on("pointerdown", (event) => {
     if (getIsInteractionBlocked()) return;
     if (entity.locked) return;
+    if (isDragging) return;
 
     const pos = event.data.global;
     isDragging = true;
@@ -51,42 +65,61 @@ export function createElementBlock(
     dragOrigin = { x: sprite.x, y: sprite.y };
     lastPointer = { x: pos.x, y: pos.y };
     isSnapping = false;
+
     pendingDirection = null;
 
     app.stage.on("pointermove", onPointerMove);
-    app.stage.once("pointerup", onPointerUp);
+
+    const handlePointerUp = () => {
+      onPointerUp();
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+    window.addEventListener("pointerup", handlePointerUp);
+
     app.ticker.add(onTick);
   });
+
   function onPointerMove(event: any) {
-    if (!isDragging) return;
-    if (isSnapping) return;
+    if (!isDragging || isSnapping) return;
+
+    if (justSnapped) {
+      justSnapped = false;
+      return;
+    }
 
     const pos = event.data.global;
-    let dx = pos.x - lastPointer.x;
-    let dy = pos.y - lastPointer.y;
+    const dx = pos.x - lastPointer.x;
+    const dy = pos.y - lastPointer.y;
 
     if (!direction && (Math.abs(dx) > 2 || Math.abs(dy) > 2)) {
       direction = Math.abs(dx) > Math.abs(dy) ? "horizontal" : "vertical";
     }
 
-    if (
+    const centerX =
+      offsetX + Math.round((sprite.x - offsetX) / cellSize) * cellSize;
+    const centerY =
+      offsetY + Math.round((sprite.y - offsetY) / cellSize) * cellSize;
+    const offsetFromCenterX = Math.abs(sprite.x - centerX);
+    const offsetFromCenterY = Math.abs(sprite.y - centerY);
+
+    const relaxedOffset = cellSize * 0.2;
+
+    const allowAxisSwitch =
       direction &&
       ((direction === "horizontal" &&
-        Math.abs(dy) > Math.abs(dx) &&
-        Math.abs(dy) > 2) ||
+        Math.abs(dy) > Math.abs(dx) * 1.1 &&
+        offsetFromCenterX < relaxedOffset) ||
         (direction === "vertical" &&
-          Math.abs(dx) > Math.abs(dy) &&
-          Math.abs(dx) > 2))
-    ) {
-      pendingDirection = direction === "horizontal" ? "vertical" : "horizontal";
-      pendingPointer = { x: pos.x, y: pos.y };
+          Math.abs(dx) > Math.abs(dy) * 1.1 &&
+          offsetFromCenterY < relaxedOffset));
 
-      const centerX =
-        offsetX + Math.round((sprite.x - offsetX) / cellSize) * cellSize;
-      const centerY =
-        offsetY + Math.round((sprite.y - offsetY) / cellSize) * cellSize;
-      snapTarget = { x: centerX, y: centerY };
-      isSnapping = true;
+    if (allowAxisSwitch) {
+      sprite.x = centerX;
+      sprite.y = centerY;
+
+      direction = direction === "horizontal" ? "vertical" : "horizontal";
+      dragOrigin = { x: sprite.x, y: sprite.y };
+      lastPointer = { x: pos.x, y: pos.y };
       return;
     }
 
@@ -94,8 +127,8 @@ export function createElementBlock(
     const gridY = Math.round((dragOrigin.y - offsetY) / cellSize);
 
     if (direction === "horizontal") {
-      let pixelOffset = pos.x - lastPointer.x;
-      let rawX = dragOrigin.x + pixelOffset;
+      const pixelOffset = pos.x - lastPointer.x;
+      const rawX = dragOrigin.x + pixelOffset;
 
       let minCellX = gridX;
       let maxCellX = gridX;
@@ -107,16 +140,15 @@ export function createElementBlock(
         if (!isAllowedCell(tx, gridY, elements, fieldMatrix, entity)) break;
         maxCellX = tx;
       }
-      let minX = offsetX + minCellX * cellSize;
-      let maxX = offsetX + maxCellX * cellSize;
+      const minX = offsetX + minCellX * cellSize;
+      const maxX = offsetX + maxCellX * cellSize;
 
-      let nextX = Math.max(minX, Math.min(maxX, rawX));
-      sprite.x = nextX;
+      sprite.x = Math.max(minX, Math.min(maxX, rawX));
       sprite.y = dragOrigin.y;
       entity.x = Math.round((sprite.x - offsetX) / cellSize);
     } else if (direction === "vertical") {
-      let pixelOffset = pos.y - lastPointer.y;
-      let rawY = dragOrigin.y + pixelOffset;
+      const pixelOffset = pos.y - lastPointer.y;
+      const rawY = dragOrigin.y + pixelOffset;
 
       let minCellY = gridY;
       let maxCellY = gridY;
@@ -128,19 +160,14 @@ export function createElementBlock(
         if (!isAllowedCell(gridX, ty, elements, fieldMatrix, entity)) break;
         maxCellY = ty;
       }
-      let minY = offsetY + minCellY * cellSize;
-      let maxY = offsetY + maxCellY * cellSize;
+      const minY = offsetY + minCellY * cellSize;
+      const maxY = offsetY + maxCellY * cellSize;
 
-      let nextY = Math.max(minY, Math.min(maxY, rawY));
-      sprite.y = nextY;
+      sprite.y = Math.max(minY, Math.min(maxY, rawY));
       sprite.x = dragOrigin.x;
       entity.y = Math.round((sprite.y - offsetY) / cellSize);
     }
 
-    const centerX =
-      offsetX + Math.round((sprite.x - offsetX) / cellSize) * cellSize;
-    const centerY =
-      offsetY + Math.round((sprite.y - offsetY) / cellSize) * cellSize;
     if (
       Math.abs(sprite.x - centerX) < cellSize * 0.1 &&
       Math.abs(sprite.y - centerY) < cellSize * 0.1
@@ -151,15 +178,21 @@ export function createElementBlock(
   }
 
   function onTick() {
-    if (!isSnapping) return;
+    const centerX =
+      offsetX + Math.round((sprite.x - offsetX) / cellSize) * cellSize;
+    const centerY =
+      offsetY + Math.round((sprite.y - offsetY) / cellSize) * cellSize;
 
-    sprite.x = snapTarget.x;
-    sprite.y = snapTarget.y;
+    const distX = Math.abs(sprite.x - centerX);
+    const distY = Math.abs(sprite.y - centerY);
 
-    isSnapping = false;
-    direction = pendingDirection;
-    dragOrigin = { x: sprite.x, y: sprite.y };
-    lastPointer = { x: pendingPointer.x, y: pendingPointer.y };
+    const snapThreshold = cellSize * 0.1;
+    const snapSpeedFactor = 0.8;
+
+    if (distX < snapThreshold && distY < snapThreshold) {
+      sprite.x = lerp(sprite.x, centerX, snapSpeedFactor);
+      sprite.y = lerp(sprite.y, centerY, snapSpeedFactor);
+    }
   }
 
   function onPointerUp() {
@@ -179,6 +212,11 @@ export function createElementBlock(
       }
     }
   }
+
+  function lerp(start: number, end: number, t: number) {
+    return start + (end - start) * t;
+  }
+
   app.stage.addChild(sprite);
   return entity;
 }
