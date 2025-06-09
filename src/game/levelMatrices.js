@@ -1,4 +1,4 @@
-export const levelMatrices: number[][][] = [
+export const levelMatrices = [
   // Lvl 1
   [
     [0, 109, 0, 0, 0, 0, 0, 111, 0],

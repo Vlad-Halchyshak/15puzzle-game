@@ -1,16 +1,8 @@
-import { ElementEntity } from "../types";
-
-export function isAllowedCell(
-  x: number,
-  y: number,
-  elements: ElementEntity[],
-  fieldMatrix: number[][],
-  entity: ElementEntity
-): boolean {
+export function isAllowedCell(x, y, elements, fieldMatrix, entity) {
   const val = fieldMatrix?.[y]?.[x];
   if (val == null) return false;
 
-  const currentPosMap = new Map<string, ElementEntity>();
+  const currentPosMap = new Map();
   for (const e of elements) {
     if (e !== entity) {
       currentPosMap.set(`${e.x},${e.y}`, e);
@@ -36,7 +28,7 @@ export function isAllowedCell(
       !isOccupied
     );
   }
-  //For block 9, 10, 11, 12
+  //For blocks 9, 10, 11, 12
 
   if (entity.type >= 9 && entity.type <= 12) {
     const isOwnSocket = val === 100 + entity.type;
@@ -62,51 +54,3 @@ export function isAllowedCell(
 
   return false;
 }
-
-/* export function isValidPath(
-  entity: ElementEntity,
-  newX: number,
-  newY: number,
-  elements: ElementEntity[],
-  fieldMatrix: number[][]
-) {
-  const dx = newX - entity.x;
-  const dy = newY - entity.y;
-
-  if (dx !== 0 && dy !== 0) return false;
-
-  const stepX = dx === 0 ? 0 : dx > 0 ? 1 : -1;
-  const stepY = dy === 0 ? 0 : dy > 0 ? 1 : -1;
-
-  let x = entity.x + stepX;
-  let y = entity.y + stepY;
-
-  while (x !== newX || y !== newY) {
-    const val = fieldMatrix[y][x];
-
-    const allowed =
-      val === 1 || val === 100 + entity.type || val === entity.type;
-
-    const blocked = elements.some(
-      (e) => e !== entity && e.x === x && e.y === y
-    );
-
-    if (!allowed || blocked) return false;
-
-    x += stepX;
-    y += stepY;
-  }
-
-  const finalVal = fieldMatrix[newY][newX];
-  const finalAllowed =
-    finalVal === 1 ||
-    finalVal === 100 + entity.type ||
-    finalVal === entity.type;
-
-  const finalBlocked = elements.some(
-    (e) => e !== entity && e.x === newX && e.y === newY
-  );
-
-  return finalAllowed && !finalBlocked;
-}
- */

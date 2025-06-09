@@ -1,20 +1,4 @@
-import { Application, Sprite } from "pixi.js";
-import { ElementEntity } from "../../types";
 import { isAllowedCell } from "../../helpers/boardHelper";
-
-interface CreateDraggableBlockParams {
-  app: Application;
-  sprite: Sprite;
-  x: number;
-  y: number;
-  cellSize: number;
-  offsetX: number;
-  offsetY: number;
-  fieldMatrix: number[][];
-  elements: ElementEntity[];
-  getIsInteractionBlocked: () => boolean;
-  type: number;
-}
 
 export function createDraggableBlock({
   app,
@@ -28,7 +12,7 @@ export function createDraggableBlock({
   elements,
   getIsInteractionBlocked,
   type,
-}: CreateDraggableBlockParams): ElementEntity {
+}) {
   sprite.width = sprite.height = cellSize;
   sprite.x = offsetX + x * cellSize;
   sprite.y = offsetY + y * cellSize;
@@ -37,7 +21,7 @@ export function createDraggableBlock({
   sprite.interactive = true;
   sprite.cursor = "pointer";
 
-  const entity: ElementEntity = {
+  const entity = {
     sprite,
     x,
     y,
@@ -47,11 +31,11 @@ export function createDraggableBlock({
   };
 
   let isDragging = false;
-  let direction: "horizontal" | "vertical" | null = null;
+  let direction = null;
   let dragOrigin = { x: 0, y: 0 };
   let lastPointer = { x: 0, y: 0 };
   let isSnapping = false;
-  let pendingDirection: "horizontal" | "vertical" | null = null;
+  let pendingDirection = null;
   let justSnapped = false;
 
   sprite.on("pointerdown", (event) => {
@@ -79,7 +63,7 @@ export function createDraggableBlock({
     app.ticker.add(onTick);
   });
 
-  function onPointerMove(event: any) {
+  function onPointerMove(event) {
     if (!isDragging || isSnapping) return;
 
     if (justSnapped) {
@@ -213,7 +197,7 @@ export function createDraggableBlock({
     }
   }
 
-  function lerp(start: number, end: number, t: number) {
+  function lerp(start, end, t) {
     return start + (end - start) * t;
   }
 

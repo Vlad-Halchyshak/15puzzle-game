@@ -1,4 +1,4 @@
-export function styleButton(btn: HTMLButtonElement) {
+export function styleButton(btn) {
   btn.style.padding = "12px 24px";
   btn.style.fontSize = "20px";
   btn.style.border = "none";

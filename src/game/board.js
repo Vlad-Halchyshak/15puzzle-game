@@ -1,13 +1,12 @@
-import { Application, Sprite, Texture } from "pixi.js";
-import { ElementEntity, LoadedTextures } from "../types";
+import { Sprite } from "pixi.js";
 import { createDraggableBlock } from "./handlers/createDragableBlock";
 
 export function createBoard(
-  app: Application,
-  textures: LoadedTextures,
-  fieldMatrix: number[][],
-  getIsInteractionBlocked: () => boolean
-): ElementEntity[] {
+  app,
+  textures,
+  fieldMatrix,
+  getIsInteractionBlocked
+) {
   const { background, fire, water, earth, air, cell, block, main } = textures;
 
   const bg = new Sprite(background);
@@ -19,7 +18,7 @@ export function createBoard(
   const offsetX = 600;
   const offsetY = 200;
 
-  const elements: ElementEntity[] = [];
+  const elements = [];
   app.stage.sortableChildren = true;
 
   for (let y = 0; y < fieldMatrix.length; y++) {
@@ -35,7 +34,7 @@ export function createBoard(
 
       app.stage.addChild(cellSprite);
 
-      const textureMap: Record<number, Sprite> = {
+      const textureMap = {
         3: new Sprite(main),
         2: new Sprite(block),
         9: new Sprite(fire),
@@ -69,7 +68,7 @@ export function createBoard(
         app.stage.addChild(blockSprite);
         continue;
       }
-      // for main moving block - 3
+
       if (value === 3) {
         const entity = createDraggableBlock({
           app,
@@ -84,11 +83,10 @@ export function createBoard(
           getIsInteractionBlocked,
           type: 3,
         });
-
         elements.push(entity);
         continue;
       }
-      // for elements 9-12(fire, earth, water, air)
+
       if (value >= 9 && value <= 12) {
         const entity = createDraggableBlock({
           app,
@@ -103,11 +101,11 @@ export function createBoard(
           getIsInteractionBlocked,
           type: value,
         });
-
         elements.push(entity);
         continue;
       }
     }
   }
+
   return elements;
 }

@@ -2,7 +2,6 @@ import { checkAllElementsLocked } from "../helpers/checkAllElementsLocked";
 import { createBoard } from "./board";
 import { styleButton } from "../ui/styleButton";
 import { levelMatrices } from "./levelMatrices";
-import { SetupGameHandlersProps } from "../types";
 
 export function setupGameHandlers({
   app,
@@ -10,8 +9,8 @@ export function setupGameHandlers({
   buttonContainer,
   timerDisplay,
   gameAPI,
-}: SetupGameHandlersProps) {
-  const startLevel = (level: number) => {
+}) {
+  const startLevel = (level) => {
     gameAPI.setCurrentLevel(level);
     app.stage.removeChildren();
 
@@ -22,8 +21,8 @@ export function setupGameHandlers({
     gameAPI.setElements(elements);
 
     gameAPI.setIsBlocked(false);
-    //gameAPI.setTimeRemaining(40);
-    gameAPI.setTimeRemaining(42323223230);
+    gameAPI.setTimeRemaining(59);
+
     updateTimerUI();
 
     const oldInterval = gameAPI.getIntervalId();
@@ -82,7 +81,7 @@ export function setupGameHandlers({
     timerDisplay.style.color = "#ff6666";
   }
 
-  function showTimeoutButtons(level: number) {
+  function showTimeoutButtons(level) {
     buttonContainer.innerHTML = "";
 
     const restartBtn = document.createElement("button");
@@ -108,7 +107,7 @@ export function setupGameHandlers({
     }
   }
 
-  function showNextLevelButton(level: number) {
+  function showNextLevelButton(level) {
     buttonContainer.innerHTML = "";
 
     const restartBtn = document.createElement("button");

@@ -1,7 +1,6 @@
 import { Assets } from "pixi.js";
-import { LoadedTextures } from "../types";
 
-export async function loadTextures(): Promise<LoadedTextures> {
+export async function loadTextures() {
   Assets.addBundle("main", {
     background: "/assets/soloLeveling.jpeg",
     main: "/assets/main.png",
@@ -14,5 +13,5 @@ export async function loadTextures(): Promise<LoadedTextures> {
   });
 
   const bundle = await Assets.loadBundle("main");
-  return bundle as LoadedTextures;
+  return bundle;
 }
