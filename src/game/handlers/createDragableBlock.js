@@ -39,6 +39,7 @@ export function createDraggableBlock({
   let justSnapped = false;
   let targetX = sprite.x;
   let targetY = sprite.y;
+  let dragOffset = { x: 0, y: 0 };
 
   sprite.on("pointerdown", (event) => {
     if (getIsInteractionBlocked()) return;
@@ -46,13 +47,27 @@ export function createDraggableBlock({
     if (isDragging) return;
 
     const pos = event.data.global;
-    isDragging = true;
-    direction = null;
-    dragOrigin = { x: sprite.x, y: sprite.y };
-    lastPointer = { x: pos.x, y: pos.y };
-    isSnapping = false;
 
+    isDragging = false;
+    direction = null;
+    isSnapping = false;
+    justSnapped = false;
     pendingDirection = null;
+
+    const snappedX =
+      offsetX + Math.round((sprite.x - offsetX) / cellSize) * cellSize;
+    const snappedY =
+      offsetY + Math.round((sprite.y - offsetY) / cellSize) * cellSize;
+
+    sprite.x = snappedX;
+    sprite.y = snappedY;
+
+    dragOffset = { x: pos.x - sprite.x, y: pos.y - sprite.y };
+
+    lastPointer = { x: pos.x, y: pos.y };
+    dragOrigin = { x: snappedX, y: snappedY };
+    targetX = snappedX;
+    targetY = snappedY;
 
     app.stage.on("pointermove", onPointerMove);
 
@@ -66,19 +81,26 @@ export function createDraggableBlock({
   });
 
   function onPointerMove(event) {
+    const pos = event.data.global;
+    const dx = pos.x - lastPointer.x;
+    const dy = pos.y - lastPointer.y;
+
+    if (!isDragging && (Math.abs(dx) > 1 || Math.abs(dy) > 1)) {
+      isDragging = true;
+    }
+
     if (!isDragging || isSnapping) return;
     if (justSnapped) {
       justSnapped = false;
       return;
     }
 
-    const pos = event.data.global;
-    const dx = pos.x - lastPointer.x;
-    const dy = pos.y - lastPointer.y;
-
-    if (!direction && (Math.abs(dx) > 2 || Math.abs(dy) > 2)) {
+    if (!direction && (Math.abs(dx) > 0 || Math.abs(dy) > 0)) {
       direction = Math.abs(dx) > Math.abs(dy) ? "horizontal" : "vertical";
     }
+
+    const cursorPosX = pos.x - dragOffset.x;
+    const cursorPosY = pos.y - dragOffset.y;
 
     const centerX =
       offsetX + Math.round((sprite.x - offsetX) / cellSize) * cellSize;
@@ -110,7 +132,7 @@ export function createDraggableBlock({
     const gridY = Math.round((dragOrigin.y - offsetY) / cellSize);
 
     if (direction === "horizontal") {
-      const cursorDelta = pos.x - dragOrigin.x;
+      const cursorDelta = cursorPosX - dragOrigin.x;
 
       let minCellX = gridX;
       let maxCellX = gridX;
@@ -130,7 +152,7 @@ export function createDraggableBlock({
       targetY = dragOrigin.y;
       entity.x = Math.round((targetX - offsetX) / cellSize);
     } else if (direction === "vertical") {
-      const cursorDelta = pos.y - dragOrigin.y;
+      const cursorDelta = cursorPosY - dragOrigin.y;
 
       let minCellY = gridY;
       let maxCellY = gridY;
