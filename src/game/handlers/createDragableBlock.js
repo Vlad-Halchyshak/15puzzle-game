@@ -81,6 +81,7 @@ export function createDraggableBlock({
   });
 
   function onPointerMove(event) {
+    if (getIsInteractionBlocked()) return;
     const pos = event.data.global;
     const dx = pos.x - lastPointer.x;
     const dy = pos.y - lastPointer.y;
@@ -182,6 +183,25 @@ export function createDraggableBlock({
     }
   }
   function onTick() {
+    if (getIsInteractionBlocked()) {
+      const snappedX =
+        offsetX + Math.round((sprite.x - offsetX) / cellSize) * cellSize;
+      const snappedY =
+        offsetY + Math.round((sprite.y - offsetY) / cellSize) * cellSize;
+
+      sprite.x = snappedX;
+      sprite.y = snappedY;
+
+      targetX = snappedX;
+      targetY = snappedY;
+
+      entity.x = Math.round((sprite.x - offsetX) / cellSize);
+      entity.y = Math.round((sprite.y - offsetY) / cellSize);
+
+      app.ticker.remove(onTick);
+      app.stage.off("pointermove", onPointerMove);
+      return;
+    }
     const lerpFactor = 0.33;
 
     sprite.x = lerp(sprite.x, targetX, lerpFactor);
@@ -224,6 +244,7 @@ export function createDraggableBlock({
     }
   }
   function onPointerUp() {
+    if (getIsInteractionBlocked()) return;
     isDragging = false;
     app.stage.off("pointermove", onPointerMove);
     app.ticker.remove(onTick);
