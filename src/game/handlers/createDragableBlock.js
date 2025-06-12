@@ -86,10 +86,30 @@ export function createDraggableBlock({
     const dx = pos.x - lastPointer.x;
     const dy = pos.y - lastPointer.y;
 
-    if (!isDragging && (Math.abs(dx) > 1 || Math.abs(dy) > 1)) {
-      isDragging = true;
-    }
+    const movementThreshold = 0.5;
 
+    if (!isDragging) {
+      const startDrag =
+        Math.abs(pos.x - lastPointer.x) > movementThreshold ||
+        Math.abs(pos.y - lastPointer.y) > movementThreshold;
+
+      if (startDrag) {
+        isDragging = true;
+
+        const snappedX =
+          offsetX + Math.round((sprite.x - offsetX) / cellSize) * cellSize;
+        const snappedY =
+          offsetY + Math.round((sprite.y - offsetY) / cellSize) * cellSize;
+        dragOrigin = { x: snappedX, y: snappedY };
+        lastPointer = { x: pos.x, y: pos.y };
+
+        targetX = pos.x - dragOffset.x;
+        targetY = pos.y - dragOffset.y;
+
+        sprite.x = targetX;
+        sprite.y = targetY;
+      }
+    }
     if (!isDragging || isSnapping) return;
     if (justSnapped) {
       justSnapped = false;
@@ -126,6 +146,8 @@ export function createDraggableBlock({
       direction = direction === "horizontal" ? "vertical" : "horizontal";
       dragOrigin = { x: centerX, y: centerY };
       lastPointer = { x: pos.x, y: pos.y };
+
+      onPointerMove(event);
       return;
     }
 
@@ -175,6 +197,7 @@ export function createDraggableBlock({
     }
 
     if (
+      direction &&
       Math.abs(targetX - centerX) < cellSize * 0.2 &&
       Math.abs(targetY - centerY) < cellSize * 0.2
     ) {
@@ -202,14 +225,104 @@ export function createDraggableBlock({
       app.stage.off("pointermove", onPointerMove);
       return;
     }
-    const lerpFactor = 0.33;
-
+    if (!direction) return;
+    const lerpFactor = 0.29;
     sprite.x = lerp(sprite.x, targetX, lerpFactor);
     sprite.y = lerp(sprite.y, targetY, lerpFactor);
+    const centerReached =
+      Math.abs(sprite.x - targetX) < 0.5 && Math.abs(sprite.y - targetY) < 0.5;
+
+    if (centerReached && !isDragging) {
+      sprite.x = targetX;
+      sprite.y = targetY;
+    }
     const centerX =
       offsetX + Math.round((sprite.x - offsetX) / cellSize) * cellSize;
     const centerY =
       offsetY + Math.round((sprite.y - offsetY) / cellSize) * cellSize;
+
+    const gridX = Math.round((dragOrigin.x - offsetX) / cellSize);
+    const gridY = Math.round((dragOrigin.y - offsetY) / cellSize);
+
+    const cursorGlobal = app.renderer.events.pointer.global;
+    const cursorX = cursorGlobal.x - dragOffset.x;
+    const cursorY = cursorGlobal.y - dragOffset.y;
+
+    const distanceFromX = Math.abs(cursorX - sprite.x);
+    const distanceFromY = Math.abs(cursorY - sprite.y);
+
+    const offsetFromCenterX = Math.abs(sprite.x - centerX);
+    const offsetFromCenterY = Math.abs(sprite.y - centerY);
+    const relaxedOffset = cellSize * 0.25;
+
+    const canSwitchToHorizontal =
+      direction === "vertical" &&
+      Math.abs(targetY - sprite.y) < 0.5 &&
+      distanceFromX > cellSize &&
+      offsetFromCenterY < relaxedOffset;
+
+    const canSwitchToVertical =
+      direction === "horizontal" &&
+      Math.abs(targetX - sprite.x) < 0.5 &&
+      distanceFromY > cellSize &&
+      offsetFromCenterX < relaxedOffset;
+
+    if (canSwitchToHorizontal) {
+      direction = "horizontal";
+      dragOrigin = { x: centerX, y: centerY };
+    }
+
+    if (canSwitchToVertical) {
+      direction = "vertical";
+      dragOrigin = { x: centerX, y: centerY };
+    }
+    if (direction === "horizontal") {
+      const cursorX = app.renderer.events.pointer.global.x - dragOffset.x;
+      const cursorDelta = cursorX - dragOrigin.x;
+
+      let minCellX = gridX;
+      let maxCellX = gridX;
+      for (let tx = gridX - 1; tx >= 0; tx--) {
+        if (!isAllowedCell(tx, gridY, elements, fieldMatrix, entity)) break;
+        minCellX = tx;
+      }
+      for (let tx = gridX + 1; tx < fieldMatrix[0].length; tx++) {
+        if (!isAllowedCell(tx, gridY, elements, fieldMatrix, entity)) break;
+        maxCellX = tx;
+      }
+
+      const minX = offsetX + minCellX * cellSize;
+      const maxX = offsetX + maxCellX * cellSize;
+      const rawX = dragOrigin.x + cursorDelta;
+
+      targetX = Math.max(minX, Math.min(maxX, rawX));
+      targetY = dragOrigin.y;
+      entity.x = Math.round((targetX - offsetX) / cellSize);
+    }
+
+    if (direction === "vertical") {
+      const cursorY = app.renderer.events.pointer.global.y - dragOffset.y;
+      const cursorDelta = cursorY - dragOrigin.y;
+
+      let minCellY = gridY;
+      let maxCellY = gridY;
+      for (let ty = gridY - 1; ty >= 0; ty--) {
+        if (!isAllowedCell(gridX, ty, elements, fieldMatrix, entity)) break;
+        minCellY = ty;
+      }
+      for (let ty = gridY + 1; ty < fieldMatrix.length; ty++) {
+        if (!isAllowedCell(gridX, ty, elements, fieldMatrix, entity)) break;
+        maxCellY = ty;
+      }
+
+      const minY = offsetY + minCellY * cellSize;
+      const maxY = offsetY + maxCellY * cellSize;
+      const rawY = dragOrigin.y + cursorDelta;
+
+      targetY = Math.max(minY, Math.min(maxY, rawY));
+      targetX = dragOrigin.x;
+      entity.y = Math.round((targetY - offsetY) / cellSize);
+    }
 
     if (isDragging && !entity.locked && entity.type >= 9 && entity.type <= 12) {
       const spriteCenterX = sprite.x + cellSize / 2;
